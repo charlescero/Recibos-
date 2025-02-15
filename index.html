@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generar Recibo y Enviar a WhatsApp Business</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; }
+        .recibo-preview { width: 300px; margin: auto; padding: 10px; border: 1px solid #000; text-align: left; background: #f4f4f4; }
+    </style>
+</head>
+<body>
+
+    <h2>Generar Recibo y Enviar a WhatsApp Business</h2>
+    
+    <form id="reciboForm">
+        <label for="nombre">Nombre del Cliente:</label>
+        <input type="text" id="nombre" required><br>
+
+        <label for="monto">Monto:</label>
+        <input type="number" id="monto" required><br>
+
+        <label for="fecha">Fecha:</label>
+        <input type="date" id="fecha" required><br>
+
+        <label for="telefono">Número de WhatsApp:</label>
+        <input type="text" id="telefono" required placeholder="Ej: 591XXXXXXXXX"><br>
+
+        <button type="button" onclick="generarYEnviarRecibo()">Generar Recibo y Enviar</button>
+    </form>
+
+    <script>
+        const scriptURL = "https://script.google.com/macros/s/AKfycbwPz8iO0ElHKDoVzGWNyMn0oxGzyTTTtl5mrmmymceT3gAdwl3gWEmgHhWfbMT3FhXy/exec";
+
+        async function generarYEnviarRecibo() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            const nombre = document.getElementById("nombre").value;
+            const monto = document.getElementById("monto").value;
+            const fecha = document.getElementById("fecha").value;
+            const telefono = document.getElementById("telefono").value;
+
+            if (!nombre || !monto || !fecha || !telefono) {
+                alert("Por favor, llena todos los campos.");
+                return;
+            }
+
+            console.log("Generando recibo para:", nombre, monto, fecha, telefono);
+
+            // Generar PDF
+            doc.setFontSize(16);
+            doc.text("Recibo de Pago", 80, 20);
+            doc.setFontSize(12);
+            doc.text(`Nombre: ${nombre}`, 20, 40);
+            doc.text(`Monto: Bs. ${monto}`, 20, 50);
+            doc.text(`Fecha: ${fecha}`, 20, 60);
+            doc.text("Gracias por su compra.", 20, 80);
+
+            // Convertir PDF a Base64
+            const pdfDataUri = doc.output("datauristring");
+            const base64String = pdfDataUri.split(",")[1];
+
+            console.log("PDF generado en base64.");
+
+            // Subir PDF a Google Drive y obtener enlace
+            try {
+                const response = await fetch(scriptURL, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ base64: base64String, fileName: `Recibo_${nombre}.pdf` })
+                });
+
+                const result = await response.json();
+                
+                if (result.url) {
+                    console.log("Recibo subido a Google Drive:", result.url);
+                    
+                    // ✅ Enviar enlace a WhatsApp Business
+                    const mensaje = `Hola ${nombre}, aquí está tu recibo de pago:\nMonto: Bs. ${monto}\nFecha: ${fecha}\nRecibo: ${result.url}`;
+                    const whatsappBusinessURL = `intent://send/?phone=591${telefono}&text=${encodeURIComponent(mensaje)}&package=com.whatsapp.w4b#Intent;scheme=whatsapp;package=com.whatsapp.w4b;end;`;
+
+                    console.log("Intentando abrir WhatsApp Business:", whatsappBusinessURL);
+                    window.location.href = whatsappBusinessURL;
+
+                } else {
+                    alert("Error al obtener el enlace del recibo. Verifica el Google Apps Script.");
+                }
+
+            } catch (error) {
+                console.error("Error al subir el recibo:", error);
+                alert("Hubo un error al subir el recibo. Revisa la consola.");
+            }
+        }
+    </script>
+
+</body>
+</html>
